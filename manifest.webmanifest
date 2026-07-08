@@ -1,0 +1,11 @@
+{
+  "name": "脑力锻炼",
+  "short_name": "脑力锻炼",
+  "description": "舒特尔方格与单词拼写训练，内嵌本地词库。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#f7f8fb",
+  "lang": "zh-CN"
+}
