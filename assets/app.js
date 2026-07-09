@@ -265,6 +265,7 @@ function renderWordPractice() {
 
 function wordPracticeMarkup(unit, session, word) {
   const filling = session.phase === "filling";
+  const readOnly = filling ? "" : "readonly";
   const memorySeconds = session.phase === "memory" ? session.elapsed : session.memoryDuration;
   const recallSeconds = session.phase === "filling" ? session.recallDuration + session.elapsed : session.recallDuration;
   return `
@@ -278,7 +279,7 @@ function wordPracticeMarkup(unit, session, word) {
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
     <div class="letters">
-      ${Array.from({ length: word.word.length }, (_, index) => `<label class="letter-box" data-letter-box="${index}"><input maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" data-letter="${index}" value="${escapeHtml(session.inputs[index] || "")}" ${filling ? "" : "disabled"} /></label>`).join("")}
+      ${Array.from({ length: word.word.length }, (_, index) => `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" data-letter="${index}" value="${escapeHtml(session.inputs[index] || "")}" ${readOnly} /></label>`).join("")}
     </div>
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
@@ -291,14 +292,15 @@ function wordPracticeMarkup(unit, session, word) {
 }
 
 function bindWordPractice(unit, session, word) {
-  app.querySelector('[data-action="fill"]').addEventListener("click", () => {
+  const enterFilling = () => {
     if (session.phase !== "memory") return;
     session.memoryDuration = session.elapsed;
     session.elapsed = 0;
     session.phase = "filling";
     renderWordPractice();
     focusFirstEmptyLetter();
-  });
+  };
+  app.querySelector('[data-action="fill"]').addEventListener("click", enterFilling);
   app.querySelector('[data-action="hint"]').addEventListener("click", () => {
     if (session.phase !== "filling") return;
     session.recallDuration += session.elapsed;
@@ -319,7 +321,14 @@ function bindWordPractice(unit, session, word) {
   app.querySelector('[data-action="shuffled"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: true, words: shuffle(unit.words) }));
   app.querySelector('[data-action="speak"]').addEventListener("click", () => speak(word.word));
   app.querySelectorAll("[data-letter]").forEach((input) => {
+    input.addEventListener("focus", () => {
+      if (session.phase === "memory") enterFilling();
+    });
+    input.addEventListener("pointerdown", () => {
+      if (session.phase === "memory") enterFilling();
+    });
     input.addEventListener("input", () => {
+      if (session.phase !== "filling") return;
       const index = Number(input.dataset.letter);
       const letter = firstLetter(input.value);
       session.inputs[index] = letter;
@@ -329,7 +338,14 @@ function bindWordPractice(unit, session, word) {
       if (letter) focusLetter(index + 1);
     });
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Backspace" && !input.value) focusLetter(Number(input.dataset.letter) - 1);
+      if (session.phase !== "filling" || event.key !== "Backspace") return;
+      event.preventDefault();
+      const index = Number(input.dataset.letter);
+      if (input.value) {
+        session.inputs[index] = "";
+        input.value = "";
+      }
+      focusLetter(Math.max(0, index - 1));
     });
   });
 }
