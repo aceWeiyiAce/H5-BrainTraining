@@ -279,7 +279,10 @@ function wordPracticeMarkup(unit, session, word) {
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
     <div class="letters">
-      ${Array.from({ length: word.word.length }, (_, index) => `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${escapeHtml(session.inputs[index] || "")}" ${readOnly} /></label>`).join("")}
+      ${Array.from({ length: word.word.length }, (_, index) => {
+        const value = escapeHtml(session.inputs[index] || "");
+        return `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${value}" ${readOnly} /><span class="letter-display" data-letter-display="${index}">${value}</span></label>`;
+      }).join("")}
     </div>
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
@@ -320,12 +323,17 @@ function bindWordPractice(unit, session, word) {
   app.querySelector('[data-action="ordered"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: false }));
   app.querySelector('[data-action="shuffled"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: true, words: shuffle(unit.words) }));
   app.querySelector('[data-action="speak"]').addEventListener("click", () => speak(word.word));
+  const setVisibleLetter = (index, letter) => {
+    const display = app.querySelector(`[data-letter-display="${index}"]`);
+    if (display) display.textContent = letter;
+  };
   const applyLetterInput = (input, rawValue) => {
     if (session.phase !== "filling") return;
     const index = Number(input.dataset.letter);
     const letter = firstLetter(rawValue);
     session.inputs[index] = letter;
     input.value = letter;
+    setVisibleLetter(index, letter);
     if (letter && letter !== word.word[index]) flash(`[data-letter-box="${index}"]`);
     validateWord(session, word);
     if (letter) focusLetter(index + 1);
@@ -336,6 +344,7 @@ function bindWordPractice(unit, session, word) {
     if (input.value) {
       session.inputs[index] = "";
       input.value = "";
+      setVisibleLetter(index, "");
     }
     focusLetter(Math.max(0, index - 1));
   };
