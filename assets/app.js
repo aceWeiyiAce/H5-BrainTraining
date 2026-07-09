@@ -279,7 +279,7 @@ function wordPracticeMarkup(unit, session, word) {
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
     <div class="letters">
-      ${Array.from({ length: word.word.length }, (_, index) => `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" data-letter="${index}" value="${escapeHtml(session.inputs[index] || "")}" ${readOnly} /></label>`).join("")}
+      ${Array.from({ length: word.word.length }, (_, index) => `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${escapeHtml(session.inputs[index] || "")}" ${readOnly} /></label>`).join("")}
     </div>
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
@@ -320,6 +320,25 @@ function bindWordPractice(unit, session, word) {
   app.querySelector('[data-action="ordered"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: false }));
   app.querySelector('[data-action="shuffled"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: true, words: shuffle(unit.words) }));
   app.querySelector('[data-action="speak"]').addEventListener("click", () => speak(word.word));
+  const applyLetterInput = (input, rawValue) => {
+    if (session.phase !== "filling") return;
+    const index = Number(input.dataset.letter);
+    const letter = firstLetter(rawValue);
+    session.inputs[index] = letter;
+    input.value = letter;
+    if (letter && letter !== word.word[index]) flash(`[data-letter-box="${index}"]`);
+    validateWord(session, word);
+    if (letter) focusLetter(index + 1);
+  };
+  const deleteLetterInput = (input) => {
+    if (session.phase !== "filling") return;
+    const index = Number(input.dataset.letter);
+    if (input.value) {
+      session.inputs[index] = "";
+      input.value = "";
+    }
+    focusLetter(Math.max(0, index - 1));
+  };
   app.querySelectorAll("[data-letter]").forEach((input) => {
     input.addEventListener("focus", () => {
       if (session.phase === "memory") enterFilling();
@@ -327,25 +346,27 @@ function bindWordPractice(unit, session, word) {
     input.addEventListener("pointerdown", () => {
       if (session.phase === "memory") enterFilling();
     });
-    input.addEventListener("input", () => {
+    input.addEventListener("beforeinput", (event) => {
       if (session.phase !== "filling") return;
-      const index = Number(input.dataset.letter);
-      const letter = firstLetter(input.value);
-      session.inputs[index] = letter;
-      input.value = letter;
-      if (letter && letter !== word.word[index]) flash(`[data-letter-box="${index}"]`);
-      validateWord(session, word);
-      if (letter) focusLetter(index + 1);
+      if (event.inputType === "deleteContentBackward") {
+        event.preventDefault();
+        deleteLetterInput(input);
+        return;
+      }
+      if (event.inputType === "insertText" || event.inputType === "insertFromPaste") {
+        const letter = firstLetter(event.data || "");
+        if (!letter) return;
+        event.preventDefault();
+        applyLetterInput(input, letter);
+      }
+    });
+    input.addEventListener("input", () => {
+      applyLetterInput(input, input.value);
     });
     input.addEventListener("keydown", (event) => {
       if (session.phase !== "filling" || event.key !== "Backspace") return;
       event.preventDefault();
-      const index = Number(input.dataset.letter);
-      if (input.value) {
-        session.inputs[index] = "";
-        input.value = "";
-      }
-      focusLetter(Math.max(0, index - 1));
+      deleteLetterInput(input);
     });
   });
 }

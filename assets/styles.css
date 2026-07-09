@@ -320,10 +320,12 @@ button:disabled {
   outline: 0;
   background: transparent;
   color: var(--text);
+  caret-color: var(--primary);
   text-align: center;
   font-size: 28px;
   font-weight: 800;
   text-transform: lowercase;
+  -webkit-text-fill-color: var(--text);
 }
 
 .unit-header,
