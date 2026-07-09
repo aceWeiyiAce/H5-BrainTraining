@@ -1,4 +1,4 @@
-const CACHE_NAME = "brain-training-h5-v3";
+const CACHE_NAME = "brain-training-h5-v4";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

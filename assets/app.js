@@ -282,7 +282,7 @@ function wordPracticeMarkup(unit, session, word) {
     <div class="letters">
       ${Array.from({ length: word.word.length }, (_, index) => {
         const value = escapeHtml(session.inputs[index] || "");
-        return `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" maxlength="1" autocapitalize="none" autocomplete="off" spellcheck="false" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${value}" ${readOnly} /><span class="letter-display" data-letter-display="${index}">${value}</span></label>`;
+        return `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="1" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${value}" ${readOnly} /><span class="letter-display" data-letter-display="${index}">${value}</span></label>`;
       }).join("")}
     </div>
     <div class="button-stack">
@@ -303,6 +303,7 @@ function bindWordPractice(unit, session, word) {
     session.phase = "filling";
     renderWordPractice();
     focusFirstLetter();
+    window.setTimeout(() => focusFirstLetter(), 40);
   };
   const submitAnswer = () => {
     if (session.phase !== "filling") return;
@@ -405,8 +406,8 @@ function bindWordPractice(unit, session, word) {
       }
       if (event.inputType === "insertText" || event.inputType === "insertFromPaste") {
         const letter = firstLetter(event.data || "");
-        if (!letter) return;
         event.preventDefault();
+        if (!letter) return;
         applyLetterInput(input, letter);
       }
     });
