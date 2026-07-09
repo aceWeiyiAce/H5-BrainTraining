@@ -6888,7 +6888,7 @@ function bindWordPractice(unit, session, word) {
     session.elapsed = 0;
     session.phase = "filling";
     renderWordPractice();
-    focusFirstEmptyLetter();
+    focusFirstLetter();
   };
   const submitAnswer = () => {
     if (session.phase !== "filling") return;
@@ -6976,8 +6976,11 @@ function bindWordPractice(unit, session, word) {
     input.addEventListener("focus", () => {
       if (session.phase === "memory") enterFilling();
     });
-    input.addEventListener("pointerdown", () => {
-      if (session.phase === "memory") enterFilling();
+    input.addEventListener("pointerdown", (event) => {
+      if (session.phase === "memory") {
+        event.preventDefault();
+        enterFilling();
+      }
     });
     input.addEventListener("beforeinput", (event) => {
       if (session.phase !== "filling") return;
@@ -7098,6 +7101,10 @@ function firstLetter(text) {
 function focusLetter(index) {
   const input = app.querySelector(`[data-letter="${index}"]`);
   if (input) input.focus();
+}
+
+function focusFirstLetter() {
+  focusLetter(0);
 }
 
 function focusFirstEmptyLetter() {
