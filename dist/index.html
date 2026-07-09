@@ -428,6 +428,7 @@ button:disabled {
   color: #fff;
   text-align: center;
   line-height: 1.45;
+  white-space: pre-line;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
@@ -6851,6 +6852,7 @@ function renderWordPractice() {
 function wordPracticeMarkup(unit, session, word) {
   const filling = session.phase === "filling";
   const readOnly = filling ? "" : "readonly";
+  const primaryButtonTitle = session.phase === "memory" ? "开始填写" : session.phase === "filling" ? "提交答案" : "处理中...";
   const memorySeconds = session.phase === "memory" ? session.elapsed : session.memoryDuration;
   const recallSeconds = session.phase === "filling" ? session.recallDuration + session.elapsed : session.recallDuration;
   return `
@@ -6872,7 +6874,7 @@ function wordPracticeMarkup(unit, session, word) {
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
       <button class="secondary-button" data-action="hint" ${filling ? "" : "disabled"}>提示</button>
-      <button class="primary-button" data-action="fill" ${session.phase === "memory" ? "" : "disabled"}>${session.phase === "memory" ? "开始填写" : session.phase === "completed" ? "已完成" : "填写中..."}</button>
+      <button class="primary-button" data-action="fill" ${session.phase === "completed" ? "disabled" : ""}>${primaryButtonTitle}</button>
       <button class="secondary-button" data-action="ordered">查看全部（顺序）</button>
       <button class="secondary-button" data-action="shuffled">查看全部（无序）</button>
     </div>
@@ -6888,13 +6890,52 @@ function bindWordPractice(unit, session, word) {
     renderWordPractice();
     focusFirstEmptyLetter();
   };
-  app.querySelector('[data-action="fill"]').addEventListener("click", enterFilling);
+  const submitAnswer = () => {
+    if (session.phase !== "filling") return;
+    if (session.inputs.some((input) => input.length === 0)) {
+      showToast("请先填写完整单词");
+      focusFirstEmptyLetter();
+      return;
+    }
+
+    const answer = session.inputs.join("");
+    if (answer !== word.word) {
+      showToast("拼写不正确，请再试一次");
+      return;
+    }
+
+    session.recallDuration += session.elapsed;
+    saveRecord({ gridSize: word.word.length, memoryTime: session.memoryDuration, recallTime: session.recallDuration, date: new Date().toISOString(), type: "word", word: word.word });
+
+    if (session.current + 1 < session.words.length) {
+      session.phase = "completed";
+      stopTimer();
+      renderWordPractice();
+      showToast("回答正确，进入下一个单词", 900);
+      window.setTimeout(() => {
+        session.current += 1;
+        configureWord(session);
+        renderWordPractice();
+      }, 900);
+      return;
+    }
+
+    stopTimer();
+    session.phase = "completed";
+    const message = `${randomItem(["太棒了，拼写完全正确！", "完成得很漂亮，词汇记忆更稳了！", "反应很快，继续保持！", "挑战成功，这个单词拿下了！", "很好，大脑正在建立更牢的词汇连接！"])}\n\n${word.word}\n${word.phonetic || "音标待补充"}\n${formatMeaning(word)}`;
+    showModal("Success", message, () => setRoute({ name: "home" }));
+  };
+  app.querySelector('[data-action="fill"]').addEventListener("click", () => {
+    if (session.phase === "memory") {
+      enterFilling();
+      return;
+    }
+    if (session.phase === "filling") submitAnswer();
+  });
   app.querySelector('[data-action="hint"]').addEventListener("click", () => {
     if (session.phase !== "filling") return;
-    session.recallDuration += session.elapsed;
-    session.elapsed = session.memoryDuration;
-    session.phase = "memory";
-    renderWordPractice();
+    showToast(`${word.word}\n${word.phonetic || "音标待补充"}\n${formatMeaning(word)}`, 3200);
+    focusFirstEmptyFieldOrCurrent();
   });
   const previous = app.querySelector('[data-action="previous"]');
   if (previous) {
@@ -6919,8 +6960,6 @@ function bindWordPractice(unit, session, word) {
     session.inputs[index] = letter;
     input.value = letter;
     setVisibleLetter(index, letter);
-    if (letter && letter !== word.word[index]) flash(`[data-letter-box="${index}"]`);
-    validateWord(session, word);
     if (letter) focusLetter(index + 1);
   };
   const deleteLetterInput = (input) => {
@@ -6963,28 +7002,6 @@ function bindWordPractice(unit, session, word) {
       deleteLetterInput(input);
     });
   });
-}
-
-function validateWord(session, word) {
-  if (session.inputs.some((input) => input.length === 0)) return;
-  for (let index = 0; index < session.inputs.length; index += 1) {
-    if (session.inputs[index] !== word.word[index]) {
-      flash(`[data-letter-box="${index}"]`);
-      return;
-    }
-  }
-  session.recallDuration += session.elapsed;
-  saveRecord({ gridSize: word.word.length, memoryTime: session.memoryDuration, recallTime: session.recallDuration, date: new Date().toISOString(), type: "word", word: word.word });
-  if (session.current + 1 < session.words.length) {
-    session.current += 1;
-    configureWord(session);
-    renderWordPractice();
-    return;
-  }
-  stopTimer();
-  session.phase = "completed";
-  const message = `${randomItem(["太棒了，拼写完全正确！", "完成得很漂亮，词汇记忆更稳了！", "反应很快，继续保持！", "挑战成功，这个单词拿下了！", "很好，大脑正在建立更牢的词汇连接！"])}\n\n${word.word}\n${word.phonetic || "音标待补充"}\n${formatMeaning(word)}`;
-  showModal("Success", message, () => setRoute({ name: "home" }));
 }
 
 function renderWordList() {
@@ -7088,6 +7105,15 @@ function focusFirstEmptyLetter() {
   if (input) input.focus();
 }
 
+function focusFirstEmptyFieldOrCurrent() {
+  const active = document.activeElement;
+  if (active && active.matches("[data-letter]")) {
+    active.focus();
+    return;
+  }
+  focusFirstEmptyLetter();
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window) || !text) return;
   window.speechSynthesis.cancel();
@@ -7110,7 +7136,7 @@ function flash(selector) {
   window.setTimeout(() => element.classList.remove("invalid"), 300);
 }
 
-function showToast(message) {
+function showToast(message, duration = 1800) {
   const oldToast = document.querySelector(".toast");
   if (oldToast) oldToast.remove();
   const toast = document.createElement("div");
@@ -7118,7 +7144,7 @@ function showToast(message) {
   toast.textContent = message;
   document.body.appendChild(toast);
   if (state.toastTimer) window.clearTimeout(state.toastTimer);
-  state.toastTimer = window.setTimeout(() => toast.remove(), 1800);
+  state.toastTimer = window.setTimeout(() => toast.remove(), duration);
 }
 
 function showModal(title, message, onClose) {
