@@ -39,8 +39,65 @@ ${app}
 </html>
 `;
 
-const serviceWorker = `const CACHE_NAME = "brain-training-h5-v8";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const repairHtml = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f8fb" />
+    <title>正在修复缓存</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background: #f7f8fb;
+        color: #16181d;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(88vw, 420px);
+        text-align: center;
+        line-height: 1.6;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+      }
+      p {
+        margin: 0;
+        color: #68707d;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>正在修复缓存</h1>
+      <p>页面会自动跳转到最新版，请稍等。</p>
+    </main>
+    <script>
+      (async () => {
+        try {
+          if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+          }
+        } finally {
+          window.location.replace("./?cache-bust=" + Date.now());
+        }
+      })();
+    </script>
+  </body>
+</html>
+`;
+
+const serviceWorker = `const CACHE_NAME = "brain-training-h5-v9";
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./repair.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
@@ -72,6 +129,7 @@ self.addEventListener("fetch", (event) => {
 
 fs.writeFileSync(path.join(root, "share.html"), html);
 fs.writeFileSync(path.join(dist, "index.html"), html);
+fs.writeFileSync(path.join(dist, "repair.html"), repairHtml);
 fs.writeFileSync(path.join(dist, "manifest.webmanifest"), manifest);
 fs.writeFileSync(path.join(dist, "sw.js"), serviceWorker);
 

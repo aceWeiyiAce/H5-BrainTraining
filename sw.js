@@ -1,5 +1,5 @@
-const CACHE_NAME = "brain-training-h5-v8";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE_NAME = "brain-training-h5-v9";
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./repair.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
