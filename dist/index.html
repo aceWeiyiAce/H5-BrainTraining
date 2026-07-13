@@ -6841,6 +6841,7 @@ function renderWordPractice() {
 function wordPracticeMarkup(unit, session, word) {
   const filling = session.phase === "filling";
   const completed = session.phase === "completed";
+  const showAnswerInput = !completed;
   const answer = escapeHtml(session.answer || "");
   const answerLength = Math.max(word.word.length, 4);
   const answerWidth = Math.min(Math.max(answerLength * 30, 220), 520);
@@ -6856,7 +6857,7 @@ function wordPracticeMarkup(unit, session, word) {
       </div>
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
-    <div class="word-answer-wrap ${filling ? "" : "hidden"}" data-answer-box>
+    <div class="word-answer-wrap ${showAnswerInput ? "" : "hidden"}" data-answer-box>
       <input class="word-answer-input" data-word-answer type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="${word.word.length}" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="填写完整单词" style="--answer-width: ${answerWidth}px" value="${answer}" />
     </div>
     <div class="button-stack">
@@ -6943,7 +6944,19 @@ function bindWordPractice(unit, session, word) {
   app.querySelector('[data-action="speak"]').addEventListener("click", () => speak(word.word));
   const answerInput = app.querySelector("[data-word-answer]");
   if (answerInput) {
+    answerInput.addEventListener("pointerdown", (event) => {
+      if (session.phase !== "memory") return;
+      event.preventDefault();
+      enterFilling();
+    });
+    answerInput.addEventListener("focus", () => {
+      if (session.phase === "memory") enterFilling();
+    });
     answerInput.addEventListener("beforeinput", (event) => {
+      if (session.phase !== "filling") {
+        event.preventDefault();
+        return;
+      }
       if (event.inputType === "insertText" || event.inputType === "insertFromPaste") {
         const letters = onlyLetters(event.data || "");
         if (letters === event.data) return;
@@ -6952,11 +6965,16 @@ function bindWordPractice(unit, session, word) {
       }
     });
     answerInput.addEventListener("input", () => {
+      if (session.phase !== "filling") return;
       const cleaned = onlyLetters(answerInput.value).slice(0, word.word.length);
       session.answer = cleaned;
       answerInput.value = cleaned;
     });
     answerInput.addEventListener("keydown", (event) => {
+      if (session.phase === "memory") {
+        enterFilling();
+        return;
+      }
       if (event.key === "Enter") submitAnswer();
     });
   }
