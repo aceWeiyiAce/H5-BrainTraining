@@ -6586,6 +6586,7 @@ const state = {
 
 const app = document.querySelector("#app");
 const wordData = normalizeWordData(window.BRAIN_TRAINING_WORD_DATA || { units: [] });
+const WORD_ANSWER_MAX_LENGTH = 35;
 
 function normalizeWordData(data) {
   return {
@@ -6858,7 +6859,7 @@ function wordPracticeMarkup(unit, session, word) {
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
     <div class="word-answer-wrap ${showAnswerInput ? "" : "hidden"}" data-answer-box>
-      <input class="word-answer-input" data-word-answer type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="${word.word.length}" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="填写完整单词" style="--answer-width: ${answerWidth}px" value="${answer}" />
+      <input class="word-answer-input" data-word-answer type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="${WORD_ANSWER_MAX_LENGTH}" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="填写完整单词" style="--answer-width: ${answerWidth}px" value="${answer}" />
     </div>
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
@@ -6961,12 +6962,12 @@ function bindWordPractice(unit, session, word) {
         const letters = onlyLetters(event.data || "");
         if (letters === event.data) return;
         event.preventDefault();
-        insertAnswerText(answerInput, session, letters, word.word.length);
+        insertAnswerText(answerInput, session, letters, WORD_ANSWER_MAX_LENGTH);
       }
     });
     answerInput.addEventListener("input", () => {
       if (session.phase !== "filling") return;
-      const cleaned = onlyLetters(answerInput.value).slice(0, word.word.length);
+      const cleaned = onlyLetters(answerInput.value).slice(0, WORD_ANSWER_MAX_LENGTH);
       session.answer = cleaned;
       answerInput.value = cleaned;
     });
