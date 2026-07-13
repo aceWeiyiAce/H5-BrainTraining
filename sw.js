@@ -1,4 +1,4 @@
-const CACHE_NAME = "brain-training-h5-v4";
+const CACHE_NAME = "brain-training-h5-v5";
 const ASSETS = [
   "./",
   "./index.html",

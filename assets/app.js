@@ -238,7 +238,7 @@ function createWordSession(unitIndex) {
     elapsed: 0,
     memoryDuration: 0,
     recallDuration: 0,
-    inputs: [],
+    answer: "",
     completedWordIndex: -1,
   };
 }
@@ -249,14 +249,14 @@ function configureWord(session) {
   session.elapsed = 0;
   session.memoryDuration = 0;
   session.recallDuration = 0;
-  session.inputs = Array.from({ length: word.word.length }, () => "");
+  session.answer = "";
 }
 
 function renderWordPractice() {
   const unit = wordData.units[state.route.unitIndex];
   const session = state.route.session || createWordSession(state.route.unitIndex);
   state.route.session = session;
-  if (!session.inputs.length) configureWord(session);
+  if (typeof session.answer !== "string") configureWord(session);
   const word = session.words[session.current] || { word: "", phonetic: "", meaning: "", partOfSpeech: "" };
   shell(unit.title, wordPracticeMarkup(unit, session, word));
   bindWordPractice(unit, session, word);
@@ -265,8 +265,10 @@ function renderWordPractice() {
 
 function wordPracticeMarkup(unit, session, word) {
   const filling = session.phase === "filling";
-  const readOnly = filling ? "" : "readonly";
-  const primaryButtonTitle = session.phase === "memory" ? "开始填写" : session.phase === "filling" ? "提交答案" : "处理中...";
+  const completed = session.phase === "completed";
+  const answer = escapeHtml(session.answer || "");
+  const answerLength = Math.max(word.word.length, 4);
+  const answerWidth = Math.min(Math.max(answerLength * 30, 220), 520);
   const memorySeconds = session.phase === "memory" ? session.elapsed : session.memoryDuration;
   const recallSeconds = session.phase === "filling" ? session.recallDuration + session.elapsed : session.recallDuration;
   return `
@@ -279,16 +281,15 @@ function wordPracticeMarkup(unit, session, word) {
       </div>
       <p class="meaning ${filling ? "hidden" : ""}">${escapeHtml(formatMeaning(word))}</p>
     </section>
-    <div class="letters">
-      ${Array.from({ length: word.word.length }, (_, index) => {
-        const value = escapeHtml(session.inputs[index] || "");
-        return `<label class="letter-box ${filling ? "" : "memory-ready"}" data-letter-box="${index}"><input type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="1" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="第 ${index + 1} 个字母" data-letter="${index}" value="${value}" ${readOnly} /><span class="letter-display" data-letter-display="${index}">${value}</span></label>`;
-      }).join("")}
+    <div class="word-answer-wrap ${filling ? "" : "hidden"}" data-answer-box>
+      <input class="word-answer-input" data-word-answer type="text" inputmode="text" pattern="[A-Za-z]*" maxlength="${word.word.length}" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" lang="en" aria-label="填写完整单词" style="--answer-width: ${answerWidth}px" value="${answer}" />
     </div>
     <div class="button-stack">
       <button class="secondary-button ${session.current > 0 ? "" : "hidden"}" data-action="previous">上一个</button>
       <button class="secondary-button" data-action="hint" ${filling ? "" : "disabled"}>提示</button>
-      <button class="primary-button" data-action="fill" ${session.phase === "completed" ? "disabled" : ""}>${primaryButtonTitle}</button>
+      ${session.phase === "memory" ? '<button class="primary-button" data-action="fill">开始填写</button>' : ""}
+      ${filling ? '<button class="primary-button" data-action="submit-word">提交单词</button>' : ""}
+      ${completed ? '<button class="primary-button" data-action="processing" disabled>处理中...</button>' : ""}
       <button class="secondary-button" data-action="ordered">查看全部（顺序）</button>
       <button class="secondary-button" data-action="shuffled">查看全部（无序）</button>
     </div>
@@ -302,20 +303,22 @@ function bindWordPractice(unit, session, word) {
     session.elapsed = 0;
     session.phase = "filling";
     renderWordPractice();
-    focusFirstLetter();
-    window.setTimeout(() => focusFirstLetter(), 40);
+    focusWordAnswer();
+    window.setTimeout(() => focusWordAnswer(), 40);
   };
   const submitAnswer = () => {
     if (session.phase !== "filling") return;
-    if (session.inputs.some((input) => input.length === 0)) {
+    const answer = session.answer.trim().toLowerCase();
+    if (!answer) {
       showToast("请先填写完整单词");
-      focusFirstEmptyLetter();
+      focusWordAnswer();
       return;
     }
 
-    const answer = session.inputs.join("");
     if (answer !== word.word) {
-      showToast("拼写不正确，请再试一次");
+      // 答错时保留用户输入，只让整词输入框抖动标红，方便继续修改。
+      flash("[data-answer-box]");
+      focusWordAnswer();
       return;
     }
 
@@ -326,31 +329,30 @@ function bindWordPractice(unit, session, word) {
       session.phase = "completed";
       stopTimer();
       renderWordPractice();
-      showToast("回答正确，进入下一个单词", 900);
+      // 正确反馈停留 0.7 秒后再进入下一词，让用户能看到确认提示。
+      showToast("你太厉害了，回答正确", 700);
       window.setTimeout(() => {
         session.current += 1;
         configureWord(session);
         renderWordPractice();
-      }, 900);
+      }, 700);
       return;
     }
 
     stopTimer();
     session.phase = "completed";
     const message = `${randomItem(["太棒了，拼写完全正确！", "完成得很漂亮，词汇记忆更稳了！", "反应很快，继续保持！", "挑战成功，这个单词拿下了！", "很好，大脑正在建立更牢的词汇连接！"])}\n\n${word.word}\n${word.phonetic || "音标待补充"}\n${formatMeaning(word)}`;
-    showModal("Success", message, () => setRoute({ name: "home" }));
+    showToast("你太厉害了，回答正确", 700);
+    window.setTimeout(() => showModal("Success", message, () => setRoute({ name: "home" })), 700);
   };
-  app.querySelector('[data-action="fill"]').addEventListener("click", () => {
-    if (session.phase === "memory") {
-      enterFilling();
-      return;
-    }
-    if (session.phase === "filling") submitAnswer();
-  });
+  const fillButton = app.querySelector('[data-action="fill"]');
+  if (fillButton) fillButton.addEventListener("click", enterFilling);
+  const submitButton = app.querySelector('[data-action="submit-word"]');
+  if (submitButton) submitButton.addEventListener("click", submitAnswer);
   app.querySelector('[data-action="hint"]').addEventListener("click", () => {
     if (session.phase !== "filling") return;
     showToast(`${word.word}\n${word.phonetic || "音标待补充"}\n${formatMeaning(word)}`, 3200);
-    focusFirstEmptyFieldOrCurrent();
+    focusWordAnswer();
   });
   const previous = app.querySelector('[data-action="previous"]');
   if (previous) {
@@ -364,62 +366,25 @@ function bindWordPractice(unit, session, word) {
   app.querySelector('[data-action="ordered"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: false }));
   app.querySelector('[data-action="shuffled"]').addEventListener("click", () => setRoute({ name: "wordList", unitIndex: state.route.unitIndex, session, shuffled: true, words: shuffle(unit.words) }));
   app.querySelector('[data-action="speak"]').addEventListener("click", () => speak(word.word));
-  const setVisibleLetter = (index, letter) => {
-    const display = app.querySelector(`[data-letter-display="${index}"]`);
-    if (display) display.textContent = letter;
-  };
-  const applyLetterInput = (input, rawValue) => {
-    if (session.phase !== "filling") return;
-    const index = Number(input.dataset.letter);
-    const letter = firstLetter(rawValue);
-    session.inputs[index] = letter;
-    input.value = letter;
-    setVisibleLetter(index, letter);
-    if (letter) focusLetter(index + 1);
-  };
-  const deleteLetterInput = (input) => {
-    if (session.phase !== "filling") return;
-    const index = Number(input.dataset.letter);
-    if (input.value) {
-      session.inputs[index] = "";
-      input.value = "";
-      setVisibleLetter(index, "");
-    }
-    focusLetter(Math.max(0, index - 1));
-  };
-  app.querySelectorAll("[data-letter]").forEach((input) => {
-    input.addEventListener("focus", () => {
-      if (session.phase === "memory") enterFilling();
-    });
-    input.addEventListener("pointerdown", (event) => {
-      if (session.phase === "memory") {
-        event.preventDefault();
-        enterFilling();
-      }
-    });
-    input.addEventListener("beforeinput", (event) => {
-      if (session.phase !== "filling") return;
-      if (event.inputType === "deleteContentBackward") {
-        event.preventDefault();
-        deleteLetterInput(input);
-        return;
-      }
+  const answerInput = app.querySelector("[data-word-answer]");
+  if (answerInput) {
+    answerInput.addEventListener("beforeinput", (event) => {
       if (event.inputType === "insertText" || event.inputType === "insertFromPaste") {
-        const letter = firstLetter(event.data || "");
+        const letters = onlyLetters(event.data || "");
+        if (letters === event.data) return;
         event.preventDefault();
-        if (!letter) return;
-        applyLetterInput(input, letter);
+        insertAnswerText(answerInput, session, letters, word.word.length);
       }
     });
-    input.addEventListener("input", () => {
-      applyLetterInput(input, input.value);
+    answerInput.addEventListener("input", () => {
+      const cleaned = onlyLetters(answerInput.value).slice(0, word.word.length);
+      session.answer = cleaned;
+      answerInput.value = cleaned;
     });
-    input.addEventListener("keydown", (event) => {
-      if (session.phase !== "filling" || event.key !== "Backspace") return;
-      event.preventDefault();
-      deleteLetterInput(input);
+    answerInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") submitAnswer();
     });
-  });
+  }
 }
 
 function renderWordList() {
@@ -508,32 +473,23 @@ function formatMeaning(word) {
   return `${partOfSpeech} ${meaning}`;
 }
 
-function firstLetter(text) {
-  const match = String(text || "").match(/[A-Za-z]/);
-  return match ? match[0].toLowerCase() : "";
+function onlyLetters(text) {
+  return String(text || "").replace(/[^A-Za-z]/g, "").toLowerCase();
 }
 
-function focusLetter(index) {
-  const input = app.querySelector(`[data-letter="${index}"]`);
+function focusWordAnswer() {
+  const input = app.querySelector("[data-word-answer]");
   if (input) input.focus();
 }
 
-function focusFirstLetter() {
-  focusLetter(0);
-}
-
-function focusFirstEmptyLetter() {
-  const input = [...app.querySelectorAll("[data-letter]")].find((item) => !item.value);
-  if (input) input.focus();
-}
-
-function focusFirstEmptyFieldOrCurrent() {
-  const active = document.activeElement;
-  if (active && active.matches("[data-letter]")) {
-    active.focus();
-    return;
-  }
-  focusFirstEmptyLetter();
+function insertAnswerText(input, session, text, maxLength) {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const nextValue = `${input.value.slice(0, start)}${text}${input.value.slice(end)}`.slice(0, maxLength);
+  session.answer = nextValue;
+  input.value = nextValue;
+  const nextCaret = Math.min(start + text.length, nextValue.length);
+  input.setSelectionRange(nextCaret, nextCaret);
 }
 
 function speak(text) {
@@ -555,7 +511,7 @@ function flash(selector) {
   const element = app.querySelector(selector);
   if (!element) return;
   element.classList.add("invalid");
-  window.setTimeout(() => element.classList.remove("invalid"), 300);
+  window.setTimeout(() => element.classList.remove("invalid"), 420);
 }
 
 function showToast(message, duration = 1800) {

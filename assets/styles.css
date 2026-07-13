@@ -227,8 +227,7 @@ button:disabled {
   transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-.grid-cell.invalid,
-.letter-box.invalid {
+.grid-cell.invalid {
   background: rgba(224, 79, 79, 0.2);
   border-color: var(--danger);
 }
@@ -290,66 +289,56 @@ button:disabled {
   white-space: pre-line;
 }
 
-.letters {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
+.word-answer-wrap {
+  display: grid;
+  justify-items: center;
   min-height: 72px;
-  overflow-x: auto;
   padding: 4px 0 10px;
 }
 
-.letter-box {
-  position: relative;
-  display: block;
-  flex: 0 0 clamp(24px, 8vw, 36px);
-  height: clamp(46px, 12vw, 56px);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 4px 12px rgba(18, 34, 66, 0.06);
-  transition: background 0.18s ease, border-color 0.18s ease;
-}
-
-.letter-box.memory-ready {
-  cursor: text;
-}
-
-.letter-box input {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  padding: 0;
+.word-answer-input {
+  width: min(100%, var(--answer-width));
+  padding: 8px 4px 12px;
   border: 0;
-  border-radius: 8px;
+  border-bottom: 3px solid var(--line);
+  border-radius: 0;
   outline: 0;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
-  color: transparent;
+  color: var(--text);
   caret-color: var(--primary);
-  text-align: center;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
   text-transform: lowercase;
-  opacity: 1;
-  -webkit-text-fill-color: transparent;
+  transition: border-color 0.18s ease, color 0.18s ease;
 }
 
-.letter-display {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  color: var(--text);
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-  pointer-events: none;
-  text-transform: lowercase;
+.word-answer-input:focus {
+  border-bottom-color: var(--primary);
+}
+
+.word-answer-wrap.invalid .word-answer-input {
+  border-bottom-color: var(--danger);
+  color: var(--danger);
+  animation: answer-shake 0.36s ease;
+}
+
+@keyframes answer-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
 }
 
 .unit-header,
@@ -405,8 +394,8 @@ button:disabled {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: max(22px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 20;
   max-width: min(92vw, 520px);
   padding: 12px 15px;
