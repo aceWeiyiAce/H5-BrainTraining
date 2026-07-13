@@ -39,7 +39,7 @@ ${app}
 </html>
 `;
 
-const serviceWorker = `const CACHE_NAME = "brain-training-h5-v7";
+const serviceWorker = `const CACHE_NAME = "brain-training-h5-v8";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
